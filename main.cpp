@@ -29,6 +29,7 @@ std::wstring g_songTitle = L"Waiting for media...";
 std::wstring g_songArtist = L"";
 HBITMAP g_hCoverImage = NULL;
 bool g_running = true;
+double g_songProgress = 0.0;
 
 // This function runs in the background and constantly updates memory with the current song!
 void FetchMediaLoop(HWND hwnd) {
@@ -43,6 +44,27 @@ void FetchMediaLoop(HWND hwnd) {
         try {
             auto session = manager.GetCurrentSession();
             if (session) {
+                auto timeline = session.GetTimelineProperties();
+                double currentProgress = 0.0;
+                if (timeline) {
+                    auto pos = timeline.Position().count();
+                    auto end = timeline.EndTime().count();
+                    if (end > 0) {
+                        currentProgress = (double)pos / end;
+                        if (currentProgress > 1.0) currentProgress = 1.0;
+                        if (currentProgress < 0.0) currentProgress = 0.0;
+                    }
+                }
+
+                bool progressChanged = false;
+                {
+                    std::lock_guard<std::mutex> lock(g_mutex);
+                    if (abs(g_songProgress - currentProgress) > 0.005) {
+                        g_songProgress = currentProgress;
+                        progressChanged = true;
+                    }
+                }
+
                 auto info = session.TryGetMediaPropertiesAsync().get();
                 std::wstring currentTitle(info.Title());
                 
@@ -99,12 +121,15 @@ void FetchMediaLoop(HWND hwnd) {
                     
                     // Tell the window to repaint itself immediately
                     InvalidateRect(hwnd, NULL, FALSE);
+                } else if (progressChanged) {
+                    InvalidateRect(hwnd, NULL, FALSE);
                 }
             } else if (lastTitle != L"") {
                 lastTitle = L"";
                 std::lock_guard<std::mutex> lock(g_mutex);
                 g_songTitle = L"No Media";
                 g_songArtist = L"";
+                g_songProgress = 0.0;
                 if (g_hCoverImage) {
                     DeleteObject(g_hCoverImage);
                     g_hCoverImage = NULL;
@@ -115,7 +140,7 @@ void FetchMediaLoop(HWND hwnd) {
             std::wcout << L"[MediaThread] Silent COM error caught, will retry next tick." << std::endl;
         }
         
-        Sleep(1000);
+        Sleep(250);
     }
 }
 
@@ -147,11 +172,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             std::wstring title, artist;
             HBITMAP cover;
+            double progress;
             {
                 std::lock_guard<std::mutex> lock(g_mutex);
                 title = g_songTitle;
                 artist = g_songArtist;
                 cover = g_hCoverImage; // Shallow copy the handle for rendering
+                progress = g_songProgress;
             }
 
             // Draw Cover
@@ -202,6 +229,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             LineTo(hdc, 395, 25);
             MoveToEx(hdc, 395, 5, NULL);
             LineTo(hdc, 375, 25);
+
+            // Draw Progress Bar Background
+            HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
+            RECT barBgRect = { 135, 105, 360, 115 };
+            FillRect(hdc, &barBgRect, barBg);
+            DeleteObject(barBg);
+
+            // Draw Progress Bar Foreground
+            if (progress > 0.0) {
+                int fillWidth = (int)(225 * progress);
+                if (fillWidth > 225) fillWidth = 225;
+                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
+                RECT barFgRect = { 135, 105, 135 + fillWidth, 115 };
+                FillRect(hdc, &barFgRect, barFg);
+                DeleteObject(barFg);
+            }
 
             SelectObject(hdc, oldPen);
             DeleteObject(whitePen);
