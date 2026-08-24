@@ -277,7 +277,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
-    const char CLASS_NAME[] = "VisualizerOverlay";
+    const wchar_t CLASS_NAME[] = L"VisualizerOverlay";
 
     WNDCLASS wc = { };
     wc.lpfnWndProc   = WindowProc;
@@ -295,7 +295,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int posY = screenHeight - WINDOW_HEIGHT - 50;
 
     HWND hwnd = CreateWindowEx(
-        exStyle, CLASS_NAME, "Audio Visualizer", style,
+        exStyle, CLASS_NAME, L"Audio Visualizer", style,
         posX, posY, WINDOW_WIDTH, WINDOW_HEIGHT,
         NULL, NULL, hInstance, NULL
     );
