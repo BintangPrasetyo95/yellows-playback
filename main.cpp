@@ -1,3 +1,8 @@
+#ifndef UNICODE
+#define UNICODE
+#define _UNICODE
+#endif
+
 #pragma comment(lib, "windowsapp")
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -30,6 +35,17 @@ std::wstring g_songArtist = L"";
 HBITMAP g_hCoverImage = NULL;
 bool g_running = true;
 double g_songProgress = 0.0;
+bool g_isPlaying = false;
+
+void SendMediaKey(WORD vk) {
+    INPUT inputs[2] = {};
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = vk;
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = vk;
+    inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(2, inputs, sizeof(INPUT));
+}
 
 // This function runs in the background and constantly updates memory with the current song!
 void FetchMediaLoop(HWND hwnd) {
@@ -56,12 +72,22 @@ void FetchMediaLoop(HWND hwnd) {
                     }
                 }
 
-                bool progressChanged = false;
+                auto playbackInfo = session.GetPlaybackInfo();
+                bool currentIsPlaying = false;
+                if (playbackInfo) {
+                    currentIsPlaying = (playbackInfo.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                }
+
+                bool stateChanged = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
                     if (abs(g_songProgress - currentProgress) > 0.005) {
                         g_songProgress = currentProgress;
-                        progressChanged = true;
+                        stateChanged = true;
+                    }
+                    if (g_isPlaying != currentIsPlaying) {
+                        g_isPlaying = currentIsPlaying;
+                        stateChanged = true;
                     }
                 }
 
@@ -121,7 +147,7 @@ void FetchMediaLoop(HWND hwnd) {
                     
                     // Tell the window to repaint itself immediately
                     InvalidateRect(hwnd, NULL, FALSE);
-                } else if (progressChanged) {
+                } else if (stateChanged) {
                     InvalidateRect(hwnd, NULL, FALSE);
                 }
             } else if (lastTitle != L"") {
@@ -156,6 +182,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Close button bounding box
             if (mouseX >= 370 && mouseX <= 400 && mouseY >= 0 && mouseY <= 30) {
                 PostQuitMessage(0);
+                return 0;
+            }
+            
+            // Media Controls bounding boxes
+            if (mouseX >= 135 && mouseX <= 165 && mouseY >= 120 && mouseY <= 145) {
+                SendMediaKey(VK_MEDIA_PREV_TRACK);
+                return 0;
+            }
+            if (mouseX >= 175 && mouseX <= 205 && mouseY >= 120 && mouseY <= 145) {
+                SendMediaKey(VK_MEDIA_PLAY_PAUSE);
+                return 0;
+            }
+            if (mouseX >= 215 && mouseX <= 245 && mouseY >= 120 && mouseY <= 145) {
+                SendMediaKey(VK_MEDIA_NEXT_TRACK);
+                return 0;
             }
             
             SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
@@ -173,12 +214,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             std::wstring title, artist;
             HBITMAP cover;
             double progress;
+            bool isPlaying;
             {
                 std::lock_guard<std::mutex> lock(g_mutex);
                 title = g_songTitle;
                 artist = g_songArtist;
                 cover = g_hCoverImage; // Shallow copy the handle for rendering
                 progress = g_songProgress;
+                isPlaying = g_isPlaying;
             }
 
             // Draw Cover
@@ -246,7 +289,51 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 DeleteObject(barFg);
             }
 
+            // Draw Media Controls
+            HBRUSH btnBrush = CreateSolidBrush(RGB(40, 40, 40));
+            HBRUSH ctrlFgBrush = CreateSolidBrush(RGB(200, 200, 200));
+            HPEN nullPen = CreatePen(PS_NULL, 0, 0);
+            
+            HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, ctrlFgBrush);
+            SelectObject(hdc, nullPen); // we already have oldPen saved, we'll restore it later
+
+            // Prev Button (135, 120, 165, 145)
+            RECT btnPrevRect = { 135, 120, 165, 145 };
+            FillRect(hdc, &btnPrevRect, btnBrush);
+            POINT prevTri[] = { {155, 127}, {155, 137}, {147, 132} };
+            Polygon(hdc, prevTri, 3);
+            RECT prevBar = { 143, 127, 145, 137 };
+            FillRect(hdc, &prevBar, ctrlFgBrush);
+
+            // Play/Pause Button (175, 120, 205, 145)
+            RECT btnPlayRect = { 175, 120, 205, 145 };
+            FillRect(hdc, &btnPlayRect, btnBrush);
+            if (isPlaying) {
+                // Draw Pause
+                RECT pauseBar1 = { 185, 127, 188, 137 };
+                RECT pauseBar2 = { 191, 127, 194, 137 };
+                FillRect(hdc, &pauseBar1, ctrlFgBrush);
+                FillRect(hdc, &pauseBar2, ctrlFgBrush);
+            } else {
+                // Draw Play
+                POINT playTri[] = { {185, 127}, {185, 137}, {193, 132} };
+                Polygon(hdc, playTri, 3);
+            }
+
+            // Next Button (215, 120, 245, 145)
+            RECT btnNextRect = { 215, 120, 245, 145 };
+            FillRect(hdc, &btnNextRect, btnBrush);
+            POINT nextTri[] = { {225, 127}, {225, 137}, {233, 132} };
+            Polygon(hdc, nextTri, 3);
+            RECT nextBar = { 235, 127, 237, 137 };
+            FillRect(hdc, &nextBar, ctrlFgBrush);
+
+            SelectObject(hdc, oldBrush);
             SelectObject(hdc, oldPen);
+            
+            DeleteObject(btnBrush);
+            DeleteObject(ctrlFgBrush);
+            DeleteObject(nullPen);
             DeleteObject(whitePen);
 
             EndPaint(hwnd, &ps);
