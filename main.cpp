@@ -259,11 +259,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hFontArtist = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
-            RECT titleRect = { 141, 36, 360, 60 };
+            RECT titleRect = { 141, 36, 363, 60 };
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            RECT artistRect = { 141, 62, 360, 95 };
+            RECT artistRect = { 141, 62, 363, 95 };
             SelectObject(hdc, hFontArtist);
             DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -293,10 +293,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Draw Progress Bar Foreground
             if (progress > 0.0) {
-                int fillWidth = (int)(225 * progress);
-                if (fillWidth > 225) fillWidth = 225;
-                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
-                RECT barFgRect = { 135, 105, 135 + fillWidth, 115 };
+                // The new width of barBgRect is 363 - 141 = 222
+                int fillWidth = (int)(222 * progress);
+                if (fillWidth > 222) fillWidth = 222;
+                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255)); // Now drawn over the new position
+                RECT barFgRect = { 141, 93, 141 + fillWidth, 104 };
                 FillRect(hdc, &barFgRect, barFg);
                 DeleteObject(barFg);
             }
