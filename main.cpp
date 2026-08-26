@@ -27,7 +27,7 @@ using namespace Windows::Media::Control;
 using namespace Windows::Storage::Streams;
 
 const int WINDOW_WIDTH = 400;
-const int WINDOW_HEIGHT = 150;
+const int WINDOW_HEIGHT = 176;
 
 std::mutex g_mutex;
 std::wstring g_songTitle = L"Waiting for media...";
@@ -36,6 +36,7 @@ HBITMAP g_hCoverImage = NULL;
 bool g_running = true;
 double g_songProgress = 0.0;
 bool g_isPlaying = false;
+Gdiplus::Image* g_imgBackground = nullptr;
 
 void SendMediaKey(WORD vk) {
     INPUT inputs[2] = {};
@@ -117,11 +118,11 @@ void FetchMediaLoop(HWND hwnd) {
                             if (pStream) {
                                 Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
                                 if (pBitmap) {
-                                    // Scale bitmap smoothly to 100x100
-                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(100, 100, pBitmap->GetPixelFormat());
+                                    // Scale bitmap smoothly to 75x75
+                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(86, 86, pBitmap->GetPixelFormat());
                                     Gdiplus::Graphics* graphics = Gdiplus::Graphics::FromImage(resized);
                                     graphics->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-                                    graphics->DrawImage(pBitmap, 0, 0, 100, 100);
+                                    graphics->DrawImage(pBitmap, 0, 0, 86, 86);
                                     resized->GetHBITMAP(Gdiplus::Color(255, 0, 255), &newCover); // Background color key (magenta)
                                     delete graphics;
                                     delete resized;
@@ -211,6 +212,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &ps.rcPaint, bgBrush);
             DeleteObject(bgBrush);
 
+            // Draw custom background image
+            if (g_imgBackground) {
+                Gdiplus::Graphics graphics(hdc);
+                // Force hard edges by disabling interpolation and smoothing
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                
+                graphics.DrawImage(g_imgBackground, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+            }
+
             std::wstring title, artist;
             HBITMAP cover;
             double progress;
@@ -228,12 +240,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (cover) {
                 HDC hMemDC = CreateCompatibleDC(hdc);
                 HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, cover);
-                BitBlt(hdc, 20, 25, 100, 100, hMemDC, 0, 0, SRCCOPY);
+                BitBlt(hdc, 37, 40, 86, 86, hMemDC, 0, 0, SRCCOPY);
                 SelectObject(hMemDC, hOldBitmap);
                 DeleteDC(hMemDC);
             } else {
                 HBRUSH placeholder = CreateSolidBrush(RGB(50, 50, 50));
-                RECT coverRect = { 20, 25, 120, 125 };
+                RECT coverRect = { 37, 40, 122, 126 }; // 20+75, 25+75
                 FillRect(hdc, &coverRect, placeholder);
                 DeleteObject(placeholder);
             }
@@ -361,6 +373,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ULONG_PTR gdiplusToken;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
     
+    // Load images
+    g_imgBackground = new Gdiplus::Image(L"./assets/components/background.png");
+
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
@@ -406,6 +421,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     if (g_hCoverImage) {
         DeleteObject(g_hCoverImage);
+    }
+
+    if (g_imgBackground) {
+        delete g_imgBackground;
     }
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
