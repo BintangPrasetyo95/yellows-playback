@@ -187,11 +187,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 // Close button
                 if (mouseX >= 333 && mouseX <= 371 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
                 // Prev button
-                if (mouseX >= 141 && mouseX <= 171 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+                if (mouseX >= 147 && mouseX <= 209 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
                 // Play button
-                if (mouseX >= 237 && mouseX <= 267 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+                if (mouseX >= 227 && mouseX <= 289 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
                 // Next button
-                if (mouseX >= 333 && mouseX <= 363 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+                if (mouseX >= 307 && mouseX <= 369 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
 
                 if (isHoveringButton) {
                     SetCursor(LoadCursor(NULL, IDC_HAND));
@@ -212,15 +212,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             
             // Media Controls bounding boxes
-            if (mouseX >= 141 && mouseX <= 171 && mouseY >= 117 && mouseY <= 139) {
+            if (mouseX >= 147 && mouseX <= 209 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_PREV_TRACK);
                 return 0;
             }
-            if (mouseX >= 237 && mouseX <= 267 && mouseY >= 117 && mouseY <= 139) {
+            if (mouseX >= 227 && mouseX <= 289 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_PLAY_PAUSE);
                 return 0;
             }
-            if (mouseX >= 333 && mouseX <= 363 && mouseY >= 117 && mouseY <= 139) {
+            if (mouseX >= 307 && mouseX <= 369 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_NEXT_TRACK);
                 return 0;
             }
