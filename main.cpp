@@ -284,7 +284,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hFontArtist = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
-            RECT titleRect = { 147, 36, 368, 60 };
+            RECT titleRect = { 147, 34, 368, 62 };
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -339,7 +339,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HPEN oldPen = (HPEN)SelectObject(hdc, nullPen); // Save oldPen here now
 
             // Prev Button
-            RECT btnPrevRect = { 147, 117, 209, 139 };
+            RECT btnPrevRect = { 145, 115, 211, 141 };
             FillRect(hdc, &btnPrevRect, btnBrush);
             POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
             Polygon(hdc, prevTri, 3);
@@ -347,7 +347,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &prevBar, ctrlFgBrush);
 
             // Play/Pause Button
-            RECT btnPlayRect = { 227, 117, 289, 139 };
+            RECT btnPlayRect = { 225, 115, 291, 141 };
             FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
                 // Draw Pause
@@ -362,7 +362,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Next Button
-            RECT btnNextRect = { 307, 117, 369, 139 };
+            RECT btnNextRect = { 305, 115, 371, 141 };
             FillRect(hdc, &btnNextRect, btnBrush);
             POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
             Polygon(hdc, nextTri, 3);

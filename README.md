@@ -7,7 +7,7 @@ A lightweight, transparent desktop overlay for displaying current media playback
 This project requires the Microsoft Visual C++ (MSVC) compiler and the Windows SDK. To compile the project, open the **x64 Native Tools Command Prompt for VS** (or an equivalent developer prompt where `cl.exe` is available) and run:
 
 ```cmd
-cl /EHsc /std:c++20 main.cpp /link /out:visualizer.exe
+cl /EHsc /std:c++20 main.cpp /link /out:yellows-playback.exe
 ```
 
 ## Running
