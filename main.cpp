@@ -37,6 +37,7 @@ bool g_running = true;
 double g_songProgress = 0.0;
 bool g_isPlaying = false;
 Gdiplus::Image* g_imgBackground = nullptr;
+bool g_isPinned = true;
 
 void SendMediaKey(WORD vk) {
     INPUT inputs[2] = {};
@@ -184,6 +185,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 int mouseY = pt.y;
 
                 bool isHoveringButton = false;
+                // Pin button
+                if (mouseX >= 291 && mouseX <= 329 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
                 // Close button
                 if (mouseX >= 333 && mouseX <= 371 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
                 // Prev button
@@ -204,6 +207,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_LBUTTONDOWN: {
             int mouseX = LOWORD(lParam);
             int mouseY = HIWORD(lParam);
+            
+            // Pin button bounding box
+            if (mouseX >= 291 && mouseX <= 329 && mouseY >= 19 && mouseY <= 32) {
+                g_isPinned = !g_isPinned;
+                if (g_isPinned) {
+                    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                } else {
+                    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                }
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
+            }
             
             // Close button bounding box
             if (mouseX >= 333 && mouseX <= 371 && mouseY >= 19 && mouseY <= 32) {
@@ -295,6 +310,38 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SelectObject(hdc, hOldFont);
             DeleteObject(hFontTitle);
             DeleteObject(hFontArtist);
+
+            // Gray pin button
+            HBRUSH pinBgBrush = CreateSolidBrush(RGB(50, 50, 50));
+            RECT pinRect = { 293, 19, 331, 32 };
+            FillRect(hdc, &pinRect, pinBgBrush);
+            DeleteObject(pinBgBrush);
+            
+            if (g_isPinned) {
+                HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
+                RECT pinHead = { 306, 21, 315, 26 };
+                FillRect(hdc, &pinHead, whiteBrush);
+                DeleteObject(whiteBrush);
+                
+                HPEN pinPen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
+                HPEN oldPinPen = (HPEN)SelectObject(hdc, pinPen);
+                MoveToEx(hdc, 310, 26, NULL);
+                LineTo(hdc, 310, 31);
+                SelectObject(hdc, oldPinPen);
+                DeleteObject(pinPen);
+            } else {
+                HPEN pinPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+                HPEN oldPinPen = (HPEN)SelectObject(hdc, pinPen);
+                HBRUSH emptyBrush = (HBRUSH)GetStockObject(NULL_BRUSH);
+                HBRUSH oldBrushPin = (HBRUSH)SelectObject(hdc, emptyBrush);
+                Rectangle(hdc, 306, 21, 315, 26);
+                SelectObject(hdc, oldBrushPin);
+                
+                MoveToEx(hdc, 310, 26, NULL);
+                LineTo(hdc, 310, 31);
+                SelectObject(hdc, oldPinPen);
+                DeleteObject(pinPen);
+            }
 
             // Gray close button
             HBRUSH grayBrush = CreateSolidBrush(RGB(50, 50, 50));
@@ -416,7 +463,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     RegisterClass(&wc);
 
-    DWORD exStyle = WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
+    DWORD exStyle = WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_APPWINDOW;
     DWORD style = WS_POPUP;
 
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
