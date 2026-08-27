@@ -175,6 +175,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     switch (uMsg) {
         case WM_CREATE:
             return 0;
+        case WM_SETCURSOR: {
+            if (LOWORD(lParam) == HTCLIENT) {
+                POINT pt;
+                GetCursorPos(&pt);
+                ScreenToClient(hwnd, &pt);
+                int mouseX = pt.x;
+                int mouseY = pt.y;
+
+                bool isHoveringButton = false;
+                // Close button
+                if (mouseX >= 333 && mouseX <= 371 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
+                // Prev button
+                if (mouseX >= 141 && mouseX <= 171 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+                // Play button
+                if (mouseX >= 237 && mouseX <= 267 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+                // Next button
+                if (mouseX >= 333 && mouseX <= 363 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
+
+                if (isHoveringButton) {
+                    SetCursor(LoadCursor(NULL, IDC_HAND));
+                    return TRUE;
+                }
+            }
+            break; // Let DefWindowProc handle the rest
+        }
 
         case WM_LBUTTONDOWN: {
             int mouseX = LOWORD(lParam);
@@ -277,6 +302,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &closeRect, grayBrush);
             DeleteObject(grayBrush);
 
+            HPEN whitePen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
+            HPEN tempPen = (HPEN)SelectObject(hdc, whitePen);
+
+            MoveToEx(hdc, 348, 21, NULL);
+            LineTo(hdc, 356, 29);
+            MoveToEx(hdc, 356, 21, NULL);
+            LineTo(hdc, 348, 29);
+
+            SelectObject(hdc, tempPen);
+            DeleteObject(whitePen);
+
             // Draw Progress Bar Background
             HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
             RECT barBgRect = { 147, 93, 368, 104 };
@@ -377,6 +413,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
+    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     RegisterClass(&wc);
 
     DWORD exStyle = WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
