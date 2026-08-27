@@ -185,6 +185,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 int mouseY = pt.y;
 
                 bool isHoveringButton = false;
+                // Volume button
+                if (mouseX >= 249 && mouseX <= 287 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
                 // Pin button
                 if (mouseX >= 291 && mouseX <= 329 && mouseY >= 19 && mouseY <= 32) isHoveringButton = true;
                 // Close button
@@ -208,6 +210,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseX = LOWORD(lParam);
             int mouseY = HIWORD(lParam);
             
+            // Volume button bounding box
+            if (mouseX >= 249 && mouseX <= 287 && mouseY >= 19 && mouseY <= 32) {
+                SendMediaKey(VK_VOLUME_MUTE);
+                return 0;
+            }
+
             // Pin button bounding box
             if (mouseX >= 291 && mouseX <= 329 && mouseY >= 19 && mouseY <= 32) {
                 g_isPinned = !g_isPinned;
@@ -311,6 +319,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(hFontTitle);
             DeleteObject(hFontArtist);
 
+            // Gray volume button
+            HBRUSH volBgBrush = CreateSolidBrush(RGB(50, 50, 50));
+            RECT volRect = { 253, 19, 291, 32 };
+            FillRect(hdc, &volRect, volBgBrush);
+            DeleteObject(volBgBrush);
+
+            // Draw speaker icon
+            HBRUSH volWhiteBrush = CreateSolidBrush(RGB(255, 255, 255));
+            HBRUSH volOldBrush = (HBRUSH)SelectObject(hdc, volWhiteBrush);
+            HPEN volWhitePen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+            HPEN volOldPen = (HPEN)SelectObject(hdc, volWhitePen);
+
+            // Body
+            RECT speakerBody = { 264, 24, 267, 28 };
+            FillRect(hdc, &speakerBody, volWhiteBrush);
+            
+            // Cone
+            POINT cone[] = { {266, 24}, {271, 20}, {271, 31}, {266, 27} };
+            Polygon(hdc, cone, 4);
+
+            SelectObject(hdc, volOldBrush);
+            SelectObject(hdc, volOldPen);
+            DeleteObject(volWhiteBrush);
+            DeleteObject(volWhitePen);
+
             // Gray pin button
             HBRUSH pinBgBrush = CreateSolidBrush(RGB(50, 50, 50));
             RECT pinRect = { 293, 19, 331, 32 };
@@ -386,7 +419,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HPEN oldPen = (HPEN)SelectObject(hdc, nullPen); // Save oldPen here now
 
             // Prev Button
-            RECT btnPrevRect = { 145, 115, 211, 141 };
+            RECT btnPrevRect = { 144, 115, 211, 141 };
             FillRect(hdc, &btnPrevRect, btnBrush);
             POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
             Polygon(hdc, prevTri, 3);
@@ -394,7 +427,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &prevBar, ctrlFgBrush);
 
             // Play/Pause Button
-            RECT btnPlayRect = { 225, 115, 291, 141 };
+            RECT btnPlayRect = { 224, 115, 291, 141 };
             FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
                 // Draw Pause
@@ -409,7 +442,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Next Button
-            RECT btnNextRect = { 305, 115, 371, 141 };
+            RECT btnNextRect = { 304, 115, 371, 141 };
             FillRect(hdc, &btnNextRect, btnBrush);
             POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
             Polygon(hdc, nextTri, 3);
