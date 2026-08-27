@@ -119,10 +119,10 @@ void FetchMediaLoop(HWND hwnd) {
                                 Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
                                 if (pBitmap) {
                                     // Scale bitmap smoothly to 75x75
-                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(86, 86, pBitmap->GetPixelFormat());
+                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(90, 90, pBitmap->GetPixelFormat());
                                     Gdiplus::Graphics* graphics = Gdiplus::Graphics::FromImage(resized);
                                     graphics->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-                                    graphics->DrawImage(pBitmap, 0, 0, 86, 86);
+                                    graphics->DrawImage(pBitmap, 0, 0, 90, 90);
                                     resized->GetHBITMAP(Gdiplus::Color(255, 0, 255), &newCover); // Background color key (magenta)
                                     delete graphics;
                                     delete resized;
@@ -181,7 +181,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseY = HIWORD(lParam);
             
             // Close button bounding box
-            if (mouseX >= 370 && mouseX <= 400 && mouseY >= 0 && mouseY <= 30) {
+            if (mouseX >= 333 && mouseX <= 371 && mouseY >= 19 && mouseY <= 32) {
                 PostQuitMessage(0);
                 return 0;
             }
@@ -240,12 +240,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (cover) {
                 HDC hMemDC = CreateCompatibleDC(hdc);
                 HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, cover);
-                BitBlt(hdc, 37, 40, 86, 86, hMemDC, 0, 0, SRCCOPY);
+                BitBlt(hdc, 30, 43, 90, 90, hMemDC, 0, 0, SRCCOPY);
                 SelectObject(hMemDC, hOldBitmap);
                 DeleteDC(hMemDC);
             } else {
                 HBRUSH placeholder = CreateSolidBrush(RGB(50, 50, 50));
-                RECT coverRect = { 37, 40, 123, 126 }; // 20+75, 25+75
+                RECT coverRect = { 30, 43, 120, 133 }; // size+original-size, size+original-size
                 FillRect(hdc, &coverRect, placeholder);
                 DeleteObject(placeholder);
             }
@@ -259,11 +259,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hFontArtist = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
-            RECT titleRect = { 141, 36, 363, 60 };
+            RECT titleRect = { 147, 36, 368, 60 };
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            RECT artistRect = { 141, 62, 363, 95 };
+            RECT artistRect = { 147, 57, 368, 100 };
             SelectObject(hdc, hFontArtist);
             DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -271,33 +271,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(hFontTitle);
             DeleteObject(hFontArtist);
 
-            // Red close button
-            HBRUSH redBrush = CreateSolidBrush(RGB(230, 0, 0));
-            RECT closeRect = { 370, 0, 400, 30 };
-            FillRect(hdc, &closeRect, redBrush);
-            DeleteObject(redBrush);
-
-            HPEN whitePen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
-            HPEN oldPen = (HPEN)SelectObject(hdc, whitePen);
-
-            MoveToEx(hdc, 375, 5, NULL);
-            LineTo(hdc, 395, 25);
-            MoveToEx(hdc, 395, 5, NULL);
-            LineTo(hdc, 375, 25);
+            // Gray close button
+            HBRUSH grayBrush = CreateSolidBrush(RGB(50, 50, 50));
+            RECT closeRect = { 333, 19, 371, 32 };
+            FillRect(hdc, &closeRect, grayBrush);
+            DeleteObject(grayBrush);
 
             // Draw Progress Bar Background
             HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
-            RECT barBgRect = { 141, 93, 363, 104 };
+            RECT barBgRect = { 147, 93, 368, 104 };
             FillRect(hdc, &barBgRect, barBg);
             DeleteObject(barBg);
 
             // Draw Progress Bar Foreground
             if (progress > 0.0) {
                 // The new width of barBgRect is 363 - 141 = 222
-                int fillWidth = (int)(222 * progress);
-                if (fillWidth > 222) fillWidth = 222;
+                int fillWidth = (int)(221 * progress);
+                if (fillWidth > 221) fillWidth = 221;
                 HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255)); // Now drawn over the new position
-                RECT barFgRect = { 141, 93, 141 + fillWidth, 104 };
+                RECT barFgRect = { 147, 93, 147 + fillWidth, 104 };
                 FillRect(hdc, &barFgRect, barFg);
                 DeleteObject(barFg);
             }
@@ -308,10 +300,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HPEN nullPen = CreatePen(PS_NULL, 0, 0);
             
             HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, ctrlFgBrush);
-            SelectObject(hdc, nullPen); // we already have oldPen saved, we'll restore it later
+            HPEN oldPen = (HPEN)SelectObject(hdc, nullPen); // Save oldPen here now
 
             // Prev Button
-            RECT btnPrevRect = { 141, 117, 203, 139 };
+            RECT btnPrevRect = { 147, 117, 209, 139 };
             FillRect(hdc, &btnPrevRect, btnBrush);
             POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
             Polygon(hdc, prevTri, 3);
@@ -319,7 +311,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &prevBar, ctrlFgBrush);
 
             // Play/Pause Button
-            RECT btnPlayRect = { 221, 117, 283, 139 };
+            RECT btnPlayRect = { 227, 117, 289, 139 };
             FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
                 // Draw Pause
@@ -334,7 +326,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Next Button
-            RECT btnNextRect = { 301, 117, 363, 139 };
+            RECT btnNextRect = { 307, 117, 369, 139 };
             FillRect(hdc, &btnNextRect, btnBrush);
             POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
             Polygon(hdc, nextTri, 3);
@@ -347,7 +339,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(btnBrush);
             DeleteObject(ctrlFgBrush);
             DeleteObject(nullPen);
-            DeleteObject(whitePen);
 
             EndPaint(hwnd, &ps);
             return 0;
