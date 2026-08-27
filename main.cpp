@@ -311,7 +311,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SelectObject(hdc, nullPen); // we already have oldPen saved, we'll restore it later
 
             // Prev Button
-            RECT btnPrevRect = { 141, 117, 171, 139 };
+            RECT btnPrevRect = { 141, 117, 203, 139 };
             FillRect(hdc, &btnPrevRect, btnBrush);
             POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
             Polygon(hdc, prevTri, 3);
@@ -319,7 +319,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &prevBar, ctrlFgBrush);
 
             // Play/Pause Button
-            RECT btnPlayRect = { 237, 117, 267, 139 };
+            RECT btnPlayRect = { 221, 117, 283, 139 };
             FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
                 // Draw Pause
@@ -334,7 +334,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Next Button
-            RECT btnNextRect = { 333, 117, 363, 139 };
+            RECT btnNextRect = { 301, 117, 363, 139 };
             FillRect(hdc, &btnNextRect, btnBrush);
             POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
             Polygon(hdc, nextTri, 3);
