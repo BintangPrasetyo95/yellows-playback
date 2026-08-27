@@ -187,15 +187,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             
             // Media Controls bounding boxes
-            if (mouseX >= 135 && mouseX <= 165 && mouseY >= 120 && mouseY <= 145) {
+            if (mouseX >= 141 && mouseX <= 171 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_PREV_TRACK);
                 return 0;
             }
-            if (mouseX >= 175 && mouseX <= 205 && mouseY >= 120 && mouseY <= 145) {
+            if (mouseX >= 237 && mouseX <= 267 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_PLAY_PAUSE);
                 return 0;
             }
-            if (mouseX >= 215 && mouseX <= 245 && mouseY >= 120 && mouseY <= 145) {
+            if (mouseX >= 333 && mouseX <= 363 && mouseY >= 117 && mouseY <= 139) {
                 SendMediaKey(VK_MEDIA_NEXT_TRACK);
                 return 0;
             }
@@ -245,7 +245,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 DeleteDC(hMemDC);
             } else {
                 HBRUSH placeholder = CreateSolidBrush(RGB(50, 50, 50));
-                RECT coverRect = { 37, 40, 122, 126 }; // 20+75, 25+75
+                RECT coverRect = { 37, 40, 123, 126 }; // 20+75, 25+75
                 FillRect(hdc, &coverRect, placeholder);
                 DeleteObject(placeholder);
             }
@@ -310,35 +310,35 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, ctrlFgBrush);
             SelectObject(hdc, nullPen); // we already have oldPen saved, we'll restore it later
 
-            // Prev Button (135, 120, 165, 145)
-            RECT btnPrevRect = { 135, 120, 165, 145 };
+            // Prev Button
+            RECT btnPrevRect = { 141, 117, 171, 139 };
             FillRect(hdc, &btnPrevRect, btnBrush);
-            POINT prevTri[] = { {155, 127}, {155, 137}, {147, 132} };
+            POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
             Polygon(hdc, prevTri, 3);
-            RECT prevBar = { 143, 127, 145, 137 };
+            RECT prevBar = { 150, 127, 152, 137 };
             FillRect(hdc, &prevBar, ctrlFgBrush);
 
-            // Play/Pause Button (175, 120, 205, 145)
-            RECT btnPlayRect = { 175, 120, 205, 145 };
+            // Play/Pause Button
+            RECT btnPlayRect = { 237, 117, 267, 139 };
             FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
                 // Draw Pause
-                RECT pauseBar1 = { 185, 127, 188, 137 };
-                RECT pauseBar2 = { 191, 127, 194, 137 };
+                RECT pauseBar1 = { 248, 127, 251, 137 };
+                RECT pauseBar2 = { 254, 127, 257, 137 };
                 FillRect(hdc, &pauseBar1, ctrlFgBrush);
                 FillRect(hdc, &pauseBar2, ctrlFgBrush);
             } else {
                 // Draw Play
-                POINT playTri[] = { {185, 127}, {185, 137}, {193, 132} };
+                POINT playTri[] = { {248, 127}, {248, 137}, {256, 132} };
                 Polygon(hdc, playTri, 3);
             }
 
-            // Next Button (215, 120, 245, 145)
-            RECT btnNextRect = { 215, 120, 245, 145 };
+            // Next Button
+            RECT btnNextRect = { 333, 117, 363, 139 };
             FillRect(hdc, &btnNextRect, btnBrush);
-            POINT nextTri[] = { {225, 127}, {225, 137}, {233, 132} };
+            POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
             Polygon(hdc, nextTri, 3);
-            RECT nextBar = { 235, 127, 237, 137 };
+            RECT nextBar = { 352, 127, 354, 137 };
             FillRect(hdc, &nextBar, ctrlFgBrush);
 
             SelectObject(hdc, oldBrush);
