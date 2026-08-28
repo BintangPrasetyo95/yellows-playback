@@ -15,7 +15,7 @@ cl /EHsc /std:c++20 main.cpp /link /out:yellows-playback.exe
 Once compiled, simply run the generated executable:
 
 ```cmd
-visualizer.exe
+yellows-playback.exe
 ```
 
 A console window will spawn for debug output, and the transparent overlay will appear on your screen, ready to fetch media updates.

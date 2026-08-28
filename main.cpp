@@ -37,6 +37,10 @@ bool g_running = true;
 double g_songProgress = 0.0;
 bool g_isPlaying = false;
 Gdiplus::Image* g_imgBackground = nullptr;
+Gdiplus::Image* g_imgPrev = nullptr;
+Gdiplus::Image* g_imgPlay = nullptr;
+Gdiplus::Image* g_imgPause = nullptr;
+Gdiplus::Image* g_imgNext = nullptr;
 bool g_isPinned = true;
 
 void SendMediaKey(WORD vk) {
@@ -419,35 +423,41 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HPEN oldPen = (HPEN)SelectObject(hdc, nullPen); // Save oldPen here now
 
             // Prev Button
-            RECT btnPrevRect = { 144, 115, 211, 141 };
-            FillRect(hdc, &btnPrevRect, btnBrush);
-            POINT prevTri[] = { {162, 127}, {162, 137}, {154, 132} };
-            Polygon(hdc, prevTri, 3);
-            RECT prevBar = { 150, 127, 152, 137 };
-            FillRect(hdc, &prevBar, ctrlFgBrush);
+            if (g_imgPrev) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgPrev, 144, 115, 67, 26);
+            }
 
             // Play/Pause Button
-            RECT btnPlayRect = { 224, 115, 291, 141 };
-            FillRect(hdc, &btnPlayRect, btnBrush);
             if (isPlaying) {
-                // Draw Pause
-                RECT pauseBar1 = { 248, 127, 251, 137 };
-                RECT pauseBar2 = { 254, 127, 257, 137 };
-                FillRect(hdc, &pauseBar1, ctrlFgBrush);
-                FillRect(hdc, &pauseBar2, ctrlFgBrush);
+                if (g_imgPause) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgPause, 224, 115, 67, 26);
+                }
             } else {
-                // Draw Play
-                POINT playTri[] = { {248, 127}, {248, 137}, {256, 132} };
-                Polygon(hdc, playTri, 3);
+                if (g_imgPlay) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgPlay, 224, 115, 67, 26);
+                }
             }
 
             // Next Button
-            RECT btnNextRect = { 304, 115, 371, 141 };
-            FillRect(hdc, &btnNextRect, btnBrush);
-            POINT nextTri[] = { {342, 127}, {342, 137}, {350, 132} };
-            Polygon(hdc, nextTri, 3);
-            RECT nextBar = { 352, 127, 354, 137 };
-            FillRect(hdc, &nextBar, ctrlFgBrush);
+            if (g_imgNext) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgNext, 304, 115, 67, 26);
+            }
 
             SelectObject(hdc, oldBrush);
             SelectObject(hdc, oldPen);
@@ -483,6 +493,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     // Load images
     g_imgBackground = new Gdiplus::Image(L"./assets/components/background.png");
+    g_imgPrev = new Gdiplus::Image(L"./assets/components/prev.png");
+    g_imgPlay = new Gdiplus::Image(L"./assets/components/play.png");
+    g_imgPause = new Gdiplus::Image(L"./assets/components/pause.png");
+    g_imgNext = new Gdiplus::Image(L"./assets/components/next.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -534,6 +548,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     if (g_imgBackground) {
         delete g_imgBackground;
+    }
+    if (g_imgPrev) {
+        delete g_imgPrev;
+    }
+    if (g_imgPlay) {
+        delete g_imgPlay;
+    }
+    if (g_imgPause) {
+        delete g_imgPause;
+    }
+    if (g_imgNext) {
+        delete g_imgNext;
     }
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
