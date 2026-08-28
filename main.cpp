@@ -51,6 +51,8 @@ Gdiplus::Image* g_imgPinOff = nullptr;
 Gdiplus::Image* g_imgClose = nullptr;
 bool g_isPinned = true;
 bool g_isMuted = false;
+double g_seekRequest = -1.0;
+ULONGLONG g_lastInteractionTime = 0;
 
 void SendMediaKey(WORD vk) {
     INPUT inputs[2] = {};
@@ -79,8 +81,20 @@ void FetchMediaLoop(HWND hwnd) {
                 auto timeline = session.GetTimelineProperties();
                 double currentProgress = 0.0;
                 if (timeline) {
-                    auto pos = timeline.Position().count();
+                    double localSeekRequest = -1.0;
+                    {
+                        std::lock_guard<std::mutex> lock(g_mutex);
+                        localSeekRequest = g_seekRequest;
+                        g_seekRequest = -1.0;
+                    }
                     auto end = timeline.EndTime().count();
+                    
+                    if (localSeekRequest >= 0.0 && end > 0) {
+                        int64_t targetPos = (int64_t)(end * localSeekRequest);
+                        session.TryChangePlaybackPositionAsync(targetPos).get();
+                    }
+
+                    auto pos = timeline.Position().count();
                     if (end > 0) {
                         currentProgress = (double)pos / end;
                         if (currentProgress > 1.0) currentProgress = 1.0;
@@ -114,17 +128,19 @@ void FetchMediaLoop(HWND hwnd) {
                 bool stateChanged = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
-                    if (abs(g_songProgress - currentProgress) > 0.005) {
-                        g_songProgress = currentProgress;
-                        stateChanged = true;
-                    }
-                    if (g_isPlaying != currentIsPlaying) {
-                        g_isPlaying = currentIsPlaying;
-                        stateChanged = true;
-                    }
-                    if (g_isMuted != currentIsMuted) {
-                        g_isMuted = currentIsMuted;
-                        stateChanged = true;
+                    if (GetTickCount64() - g_lastInteractionTime > 1000) {
+                        if (abs(g_songProgress - currentProgress) > 0.005) {
+                            g_songProgress = currentProgress;
+                            stateChanged = true;
+                        }
+                        if (g_isPlaying != currentIsPlaying) {
+                            g_isPlaying = currentIsPlaying;
+                            stateChanged = true;
+                        }
+                        if (g_isMuted != currentIsMuted) {
+                            g_isMuted = currentIsMuted;
+                            stateChanged = true;
+                        }
                     }
                 }
 
@@ -248,6 +264,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 // Next button
                 if (mouseX >= 307 && mouseX <= 369 && mouseY >= 117 && mouseY <= 139) isHoveringButton = true;
 
+                // Progress bar
+                if (mouseX >= 147 && mouseX <= 368 && mouseY >= 93 && mouseY <= 104) isHoveringButton = true;
+                
                 if (isHoveringButton) {
                     SetCursor(LoadCursor(NULL, IDC_HAND));
                     return TRUE;
@@ -262,8 +281,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             // Volume button bounding box
             if (mouseX >= 249 && mouseX <= 287 && mouseY >= 19 && mouseY <= 32) {
+                g_lastInteractionTime = GetTickCount64();
                 g_isMuted = !g_isMuted;
                 SendMediaKey(VK_VOLUME_MUTE);
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
+            }
+
+            // Progress bar bounding box
+            if (mouseX >= 147 && mouseX <= 368 && mouseY >= 93 && mouseY <= 104) {
+                g_lastInteractionTime = GetTickCount64();
+                double targetProgress = (double)(mouseX - 147) / (368 - 147);
+                if (targetProgress < 0.0) targetProgress = 0.0;
+                if (targetProgress > 1.0) targetProgress = 1.0;
+                
+                std::lock_guard<std::mutex> lock(g_mutex);
+                g_seekRequest = targetProgress;
+                
+                // Immediately update visually for responsiveness
+                g_songProgress = targetProgress;
                 InvalidateRect(hwnd, NULL, FALSE);
                 return 0;
             }
@@ -292,7 +328,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 return 0;
             }
             if (mouseX >= 227 && mouseX <= 289 && mouseY >= 117 && mouseY <= 139) {
+                g_lastInteractionTime = GetTickCount64();
+                g_isPlaying = !g_isPlaying;
                 SendMediaKey(VK_MEDIA_PLAY_PAUSE);
+                InvalidateRect(hwnd, NULL, FALSE);
                 return 0;
             }
             if (mouseX >= 307 && mouseX <= 369 && mouseY >= 117 && mouseY <= 139) {
