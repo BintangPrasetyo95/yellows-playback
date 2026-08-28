@@ -16,6 +16,7 @@
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <string>
@@ -49,6 +50,7 @@ Gdiplus::Image* g_imgSoundOff = nullptr;
 Gdiplus::Image* g_imgPinOn = nullptr;
 Gdiplus::Image* g_imgPinOff = nullptr;
 Gdiplus::Image* g_imgClose = nullptr;
+Gdiplus::Image* g_imgBorder = nullptr;
 bool g_isPinned = true;
 bool g_isMuted = false;
 double g_seekRequest = -1.0;
@@ -76,7 +78,19 @@ void FetchMediaLoop(HWND hwnd) {
 
     while (g_running) {
         try {
-            auto session = manager.GetCurrentSession();
+            auto currentSession = manager.GetCurrentSession();
+            auto sessions = manager.GetSessions();
+            GlobalSystemMediaTransportControlsSession bestSession = nullptr;
+            
+            for (auto const& s : sessions) {
+                auto playbackInfo = s.GetPlaybackInfo();
+                if (playbackInfo && playbackInfo.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+                    bestSession = s;
+                    break;
+                }
+            }
+            
+            auto session = bestSession ? bestSession : currentSession;
             if (session) {
                 auto timeline = session.GetTimelineProperties();
                 double currentProgress = 0.0;
@@ -397,6 +411,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 DeleteObject(placeholder);
             }
 
+            if (g_imgBorder) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgBorder, 19, 32, 112, 112);
+            }
+
             // Draw Text
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(0, 0, 0)); // Black text
@@ -575,6 +597,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_imgPinOn = new Gdiplus::Image(L"./assets/components/pin_on.png");
     g_imgPinOff = new Gdiplus::Image(L"./assets/components/pin_off.png");
     g_imgClose = new Gdiplus::Image(L"./assets/components/close.png");
+    g_imgBorder = new Gdiplus::Image(L"./assets/components/border.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -644,6 +667,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_imgPinOn) delete g_imgPinOn;
     if (g_imgPinOff) delete g_imgPinOff;
     if (g_imgClose) delete g_imgClose;
+    if (g_imgBorder) delete g_imgBorder;
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
