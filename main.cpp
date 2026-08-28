@@ -70,6 +70,7 @@ void FetchMediaLoop(HWND hwnd) {
     std::wcout << L"[MediaThread] Requesting media session manager..." << std::endl;
     auto manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
     std::wstring lastTitle = L"";
+    int thumbnailRetryCount = 0;
 
     while (g_running) {
         try {
@@ -130,12 +131,27 @@ void FetchMediaLoop(HWND hwnd) {
                 auto info = session.TryGetMediaPropertiesAsync().get();
                 std::wstring currentTitle(info.Title());
                 
-                if (currentTitle != lastTitle) {
-                    lastTitle = currentTitle;
+                bool needsCoverRetry = false;
+                {
+                    std::lock_guard<std::mutex> lock(g_mutex);
+                    if (g_hCoverImage == NULL && thumbnailRetryCount < 10 && currentTitle != L"") {
+                        needsCoverRetry = true;
+                    }
+                }
+
+                if (currentTitle != lastTitle || needsCoverRetry) {
+                    if (currentTitle != lastTitle) {
+                        lastTitle = currentTitle;
+                        thumbnailRetryCount = 0;
+                        std::wstring artist(info.Artist());
+                        std::wcout << L"[MediaThread] New song detected: " << currentTitle << L" by " << artist << std::endl;
+                    } else {
+                        thumbnailRetryCount++;
+                        std::wcout << L"[MediaThread] Retrying cover fetch..." << std::endl;
+                    }
                     
                     std::wstring title(info.Title());
                     std::wstring artist(info.Artist());
-                    std::wcout << L"[MediaThread] New song detected: " << title << L" by " << artist << std::endl;
                     
                     HBITMAP newCover = NULL;
                     auto thumbRef = info.Thumbnail();
