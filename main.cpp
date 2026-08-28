@@ -428,11 +428,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hFontArtist = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
-            RECT titleRect = { 147, 34, 368, 62 };
+            RECT titleRect = { 150, 36, 368, 61 };
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            RECT artistRect = { 147, 57, 368, 100 };
+            RECT artistRect = { 150, 57, 368, 100 };
             SelectObject(hdc, hFontArtist);
             DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
