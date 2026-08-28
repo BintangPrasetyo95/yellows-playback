@@ -288,12 +288,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
 
+        case WM_ERASEBKGND:
+            return 1;
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
+            HDC hdcWindow = BeginPaint(hwnd, &ps);
+
+            HDC hdc = CreateCompatibleDC(hdcWindow);
+            HBITMAP hMemBmp = CreateCompatibleBitmap(hdcWindow, WINDOW_WIDTH, WINDOW_HEIGHT);
+            HBITMAP hOldBmp = (HBITMAP)SelectObject(hdc, hMemBmp);
 
             HBRUSH bgBrush = CreateSolidBrush(RGB(255, 0, 255));
-            FillRect(hdc, &ps.rcPaint, bgBrush);
+            RECT clientRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+            FillRect(hdc, &clientRect, bgBrush);
             DeleteObject(bgBrush);
 
             // Draw custom background image
@@ -470,6 +478,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(btnBrush);
             DeleteObject(ctrlFgBrush);
             DeleteObject(nullPen);
+
+            BitBlt(hdcWindow, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hdc, 0, 0, SRCCOPY);
+            SelectObject(hdc, hOldBmp);
+            DeleteObject(hMemBmp);
+            DeleteDC(hdc);
 
             EndPaint(hwnd, &ps);
             return 0;
