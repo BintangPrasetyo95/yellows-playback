@@ -8,10 +8,13 @@
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "ole32.lib")
 
 #include <windows.h>
 #include <shlwapi.h>
 #include <gdiplus.h>
+#include <mmdeviceapi.h>
+#include <endpointvolume.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -41,7 +44,13 @@ Gdiplus::Image* g_imgPrev = nullptr;
 Gdiplus::Image* g_imgPlay = nullptr;
 Gdiplus::Image* g_imgPause = nullptr;
 Gdiplus::Image* g_imgNext = nullptr;
+Gdiplus::Image* g_imgSoundOn = nullptr;
+Gdiplus::Image* g_imgSoundOff = nullptr;
+Gdiplus::Image* g_imgPinOn = nullptr;
+Gdiplus::Image* g_imgPinOff = nullptr;
+Gdiplus::Image* g_imgClose = nullptr;
 bool g_isPinned = true;
+bool g_isMuted = false;
 
 void SendMediaKey(WORD vk) {
     INPUT inputs[2] = {};
@@ -84,6 +93,23 @@ void FetchMediaLoop(HWND hwnd) {
                     currentIsPlaying = (playbackInfo.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
                 }
 
+                bool currentIsMuted = false;
+                IMMDeviceEnumerator* pEnum = NULL;
+                if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (void**)&pEnum))) {
+                    IMMDevice* pDevice = NULL;
+                    if (SUCCEEDED(pEnum->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice))) {
+                        IAudioEndpointVolume* pVol = NULL;
+                        if (SUCCEEDED(pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (void**)&pVol))) {
+                            BOOL bMute = FALSE;
+                            pVol->GetMute(&bMute);
+                            currentIsMuted = (bMute != FALSE);
+                            pVol->Release();
+                        }
+                        pDevice->Release();
+                    }
+                    pEnum->Release();
+                }
+
                 bool stateChanged = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
@@ -93,6 +119,10 @@ void FetchMediaLoop(HWND hwnd) {
                     }
                     if (g_isPlaying != currentIsPlaying) {
                         g_isPlaying = currentIsPlaying;
+                        stateChanged = true;
+                    }
+                    if (g_isMuted != currentIsMuted) {
+                        g_isMuted = currentIsMuted;
                         stateChanged = true;
                     }
                 }
@@ -216,7 +246,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             // Volume button bounding box
             if (mouseX >= 249 && mouseX <= 287 && mouseY >= 19 && mouseY <= 32) {
+                g_isMuted = !g_isMuted;
                 SendMediaKey(VK_VOLUME_MUTE);
+                InvalidateRect(hwnd, NULL, FALSE);
                 return 0;
             }
 
@@ -323,79 +355,52 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(hFontTitle);
             DeleteObject(hFontArtist);
 
-            // Gray volume button
-            HBRUSH volBgBrush = CreateSolidBrush(RGB(50, 50, 50));
-            RECT volRect = { 253, 19, 291, 32 };
-            FillRect(hdc, &volRect, volBgBrush);
-            DeleteObject(volBgBrush);
-
-            // Draw speaker icon
-            HBRUSH volWhiteBrush = CreateSolidBrush(RGB(255, 255, 255));
-            HBRUSH volOldBrush = (HBRUSH)SelectObject(hdc, volWhiteBrush);
-            HPEN volWhitePen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-            HPEN volOldPen = (HPEN)SelectObject(hdc, volWhitePen);
-
-            // Body
-            RECT speakerBody = { 264, 24, 267, 28 };
-            FillRect(hdc, &speakerBody, volWhiteBrush);
-            
-            // Cone
-            POINT cone[] = { {266, 24}, {271, 20}, {271, 31}, {266, 27} };
-            Polygon(hdc, cone, 4);
-
-            SelectObject(hdc, volOldBrush);
-            SelectObject(hdc, volOldPen);
-            DeleteObject(volWhiteBrush);
-            DeleteObject(volWhitePen);
-
-            // Gray pin button
-            HBRUSH pinBgBrush = CreateSolidBrush(RGB(50, 50, 50));
-            RECT pinRect = { 293, 19, 331, 32 };
-            FillRect(hdc, &pinRect, pinBgBrush);
-            DeleteObject(pinBgBrush);
-            
-            if (g_isPinned) {
-                HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
-                RECT pinHead = { 306, 21, 315, 26 };
-                FillRect(hdc, &pinHead, whiteBrush);
-                DeleteObject(whiteBrush);
-                
-                HPEN pinPen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
-                HPEN oldPinPen = (HPEN)SelectObject(hdc, pinPen);
-                MoveToEx(hdc, 310, 26, NULL);
-                LineTo(hdc, 310, 31);
-                SelectObject(hdc, oldPinPen);
-                DeleteObject(pinPen);
+            // Volume Button
+            if (g_isMuted) {
+                if (g_imgSoundOff) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgSoundOff, 253, 19, 38, 13);
+                }
             } else {
-                HPEN pinPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-                HPEN oldPinPen = (HPEN)SelectObject(hdc, pinPen);
-                HBRUSH emptyBrush = (HBRUSH)GetStockObject(NULL_BRUSH);
-                HBRUSH oldBrushPin = (HBRUSH)SelectObject(hdc, emptyBrush);
-                Rectangle(hdc, 306, 21, 315, 26);
-                SelectObject(hdc, oldBrushPin);
-                
-                MoveToEx(hdc, 310, 26, NULL);
-                LineTo(hdc, 310, 31);
-                SelectObject(hdc, oldPinPen);
-                DeleteObject(pinPen);
+                if (g_imgSoundOn) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgSoundOn, 253, 19, 38, 13);
+                }
             }
 
-            // Gray close button
-            HBRUSH grayBrush = CreateSolidBrush(RGB(50, 50, 50));
-            RECT closeRect = { 333, 19, 371, 32 };
-            FillRect(hdc, &closeRect, grayBrush);
-            DeleteObject(grayBrush);
+            // Pin Button
+            if (g_isPinned) {
+                if (g_imgPinOn) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgPinOn, 293, 19, 38, 13);
+                }
+            } else {
+                if (g_imgPinOff) {
+                    Gdiplus::Graphics graphics(hdc);
+                    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                    graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                    graphics.DrawImage(g_imgPinOff, 293, 19, 38, 13);
+                }
+            }
 
-            HPEN whitePen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
-            HPEN tempPen = (HPEN)SelectObject(hdc, whitePen);
-
-            MoveToEx(hdc, 348, 21, NULL);
-            LineTo(hdc, 356, 29);
-            MoveToEx(hdc, 356, 21, NULL);
-            LineTo(hdc, 348, 29);
-
-            SelectObject(hdc, tempPen);
-            DeleteObject(whitePen);
+            // Close Button
+            if (g_imgClose) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgClose, 333, 19, 38, 13);
+            }
 
             // Draw Progress Bar Background
             HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
@@ -497,6 +502,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_imgPlay = new Gdiplus::Image(L"./assets/components/play.png");
     g_imgPause = new Gdiplus::Image(L"./assets/components/pause.png");
     g_imgNext = new Gdiplus::Image(L"./assets/components/next.png");
+    g_imgSoundOn = new Gdiplus::Image(L"./assets/components/sound_on.png");
+    g_imgSoundOff = new Gdiplus::Image(L"./assets/components/sound_off.png");
+    g_imgPinOn = new Gdiplus::Image(L"./assets/components/pin_on.png");
+    g_imgPinOff = new Gdiplus::Image(L"./assets/components/pin_off.png");
+    g_imgClose = new Gdiplus::Image(L"./assets/components/close.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -561,6 +571,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_imgNext) {
         delete g_imgNext;
     }
+    if (g_imgSoundOn) delete g_imgSoundOn;
+    if (g_imgSoundOff) delete g_imgSoundOff;
+    if (g_imgPinOn) delete g_imgPinOn;
+    if (g_imgPinOff) delete g_imgPinOff;
+    if (g_imgClose) delete g_imgClose;
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
