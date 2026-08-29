@@ -62,6 +62,17 @@ bool g_isPinned = true;
 bool g_isMuted = false;
 double g_seekRequest = -1.0;
 ULONGLONG g_lastInteractionTime = 0;
+bool HasJapaneseCharacters(const std::wstring& str) {
+    for (wchar_t c : str) {
+        if ((c >= 0x3040 && c <= 0x309F) || // Hiragana
+            (c >= 0x30A0 && c <= 0x30FF) || // Katakana
+            (c >= 0x4E00 && c <= 0x9FAF))   // Kanji
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 void SendMediaKey(WORD vk) {
     INPUT inputs[2] = {};
@@ -478,9 +489,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(0, 0, 0)); // Black text
             
-            HFONT hFontTitle = CreateFontW(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+            int titleSize = HasJapaneseCharacters(title) ? 20 : 22;
+            int artistSize = HasJapaneseCharacters(artist) ? 14 : 16;
+
+            HFONT hFontTitle = CreateFontW(titleSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
-            HFONT hFontArtist = CreateFontW(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+            HFONT hFontArtist = CreateFontW(artistSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                    CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
+            HFONT hFontTime = CreateFontW(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
             RECT titleRect = { 151, 38, 368, 60 };
@@ -502,17 +518,37 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            RECT artistRect = { 151, 54, 368, 72 };
+            RECT artistRect = { 151, 55, 368, 71 };
             SelectObject(hdc, hFontArtist);
-            DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
             
             if (!timeStr.empty()) {
-                DrawTextW(hdc, timeStr.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_RIGHT);
+                RECT timeRect = artistRect;
+                timeRect.right -= 3; // Adjust this value for more/less margin on the right
+                
+                // Use hFontTime for time text
+                SelectObject(hdc, hFontTime);
+
+                // Measure the time string width
+                SIZE timeSize;
+                GetTextExtentPoint32W(hdc, timeStr.c_str(), (int)timeStr.length(), &timeSize);
+                
+                // Draw the time string first
+                DrawTextW(hdc, timeStr.c_str(), -1, &timeRect, DT_SINGLELINE | DT_NOPREFIX | DT_RIGHT);
+                
+                // Re-select artist font for the upcoming artist drawing
+                SelectObject(hdc, hFontArtist);
+                
+                // Shrink the artist area so it doesn't overlap the time text (plus a 10px gap)
+                artistRect.right = timeRect.right - timeSize.cx - 10;
             }
+
+            // Draw the artist string (it will automatically clip with ... if it exceeds the new artistRect.right)
+            DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
             SelectObject(hdc, hOldFont);
             DeleteObject(hFontTitle);
             DeleteObject(hFontArtist);
+            DeleteObject(hFontTime);
 
             // Volume Button
             if (g_isMuted) {
