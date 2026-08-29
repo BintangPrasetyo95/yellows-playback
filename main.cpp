@@ -36,9 +36,13 @@ const int WINDOW_HEIGHT = 176;
 std::mutex g_mutex;
 std::wstring g_songTitle = L"Waiting for media...";
 std::wstring g_songArtist = L"";
+std::wstring g_songTime = L"";
 HBITMAP g_hCoverImage = NULL;
 bool g_running = true;
 double g_songProgress = 0.0;
+ULONGLONG g_lastSyncTick = 0;
+double g_syncProgress = 0.0;
+long long g_songDuration = 0;
 bool g_isPlaying = false;
 Gdiplus::Image* g_imgBackground = nullptr;
 Gdiplus::Image* g_imgPrev = nullptr;
@@ -95,8 +99,17 @@ void FetchMediaLoop(HWND hwnd) {
             
             auto session = bestSession ? bestSession : currentSession;
             if (session) {
+                auto playbackInfo = session.GetPlaybackInfo();
+                bool currentIsPlaying = false;
+                if (playbackInfo) {
+                    currentIsPlaying = (playbackInfo.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                }
+
                 auto timeline = session.GetTimelineProperties();
                 double currentProgress = 0.0;
+                long long currentDuration = 0;
+                std::wstring currentTimeStr = L"0:00 / 0:00";
+                
                 if (timeline) {
                     double localSeekRequest = -1.0;
                     {
@@ -105,6 +118,7 @@ void FetchMediaLoop(HWND hwnd) {
                         g_seekRequest = -1.0;
                     }
                     auto end = timeline.EndTime().count();
+                    currentDuration = end;
                     
                     if (localSeekRequest >= 0.0 && end > 0) {
                         int64_t targetPos = (int64_t)(end * localSeekRequest);
@@ -112,17 +126,30 @@ void FetchMediaLoop(HWND hwnd) {
                     }
 
                     auto pos = timeline.Position().count();
+                    
+                    if (currentIsPlaying) {
+                        auto lastUpdated = timeline.LastUpdatedTime();
+                        auto now = winrt::clock::now();
+                        pos += (now - lastUpdated).count();
+                    }
+                    
+                    if (pos < 0) pos = 0;
+                    if (pos > end) pos = end;
+
                     if (end > 0) {
                         currentProgress = (double)pos / end;
                         if (currentProgress > 1.0) currentProgress = 1.0;
                         if (currentProgress < 0.0) currentProgress = 0.0;
-                    }
-                }
 
-                auto playbackInfo = session.GetPlaybackInfo();
-                bool currentIsPlaying = false;
-                if (playbackInfo) {
-                    currentIsPlaying = (playbackInfo.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                        long long totalSeconds = end / 10000000;
+                        long long currentSeconds = pos / 10000000;
+                        
+                        wchar_t timeBuf[64];
+                        swprintf_s(timeBuf, L"%lld:%02lld / %lld:%02lld", 
+                                   currentSeconds / 60, currentSeconds % 60,
+                                   totalSeconds / 60, totalSeconds % 60);
+                        currentTimeStr = timeBuf;
+                    }
                 }
 
                 bool currentIsMuted = false;
@@ -145,11 +172,17 @@ void FetchMediaLoop(HWND hwnd) {
                 bool stateChanged = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
+                    
+                    // Always update sync state for continuous UI interpolation
+                    g_syncProgress = currentProgress;
+                    g_lastSyncTick = GetTickCount64();
+                    g_songDuration = currentDuration;
+                    
+                    if (g_songTime != currentTimeStr && currentTimeStr != L"") {
+                        g_songTime = currentTimeStr;
+                        stateChanged = true;
+                    }
                     if (GetTickCount64() - g_lastInteractionTime > 1000) {
-                        if (abs(g_songProgress - currentProgress) > 0.005) {
-                            g_songProgress = currentProgress;
-                            stateChanged = true;
-                        }
                         if (g_isPlaying != currentIsPlaying) {
                             g_isPlaying = currentIsPlaying;
                             stateChanged = true;
@@ -240,7 +273,11 @@ void FetchMediaLoop(HWND hwnd) {
                 std::lock_guard<std::mutex> lock(g_mutex);
                 g_songTitle = L"No Media";
                 g_songArtist = L"";
+                g_songTime = L"0:00 / 0:00";
                 g_songProgress = 0.0;
+                g_syncProgress = 0.0;
+                g_songDuration = 0;
+                g_isPlaying = false;
                 if (g_hCoverImage) {
                     DeleteObject(g_hCoverImage);
                     g_hCoverImage = NULL;
@@ -258,6 +295,20 @@ void FetchMediaLoop(HWND hwnd) {
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CREATE:
+            SetTimer(hwnd, 1, 16, NULL); // 60 FPS redraw timer
+            return 0;
+        case WM_TIMER:
+            if (wParam == 1 && g_isPlaying && g_songDuration > 0) {
+                std::lock_guard<std::mutex> lock(g_mutex);
+                double elapsedTicks = (double)(GetTickCount64() - g_lastSyncTick);
+                // g_songDuration is in 100ns. 1ms = 10,000 * 100ns.
+                g_songProgress = g_syncProgress + ((elapsedTicks * 10000.0) / g_songDuration);
+                if (g_songProgress > 1.0) g_songProgress = 1.0;
+                
+                // Redraw only the progress bar area for efficiency (or just invalidate all)
+                RECT progRect = { 147, 93, 368, 104 };
+                InvalidateRect(hwnd, &progRect, FALSE);
+            }
             return 0;
         case WM_SETCURSOR: {
             if (LOWORD(lParam) == HTCLIENT) {
@@ -387,7 +438,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 graphics.DrawImage(g_imgBackground, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
             }
 
-            std::wstring title, artist;
+            std::wstring title, artist, timeStr;
             HBITMAP cover;
             double progress;
             bool isPlaying;
@@ -395,6 +446,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 std::lock_guard<std::mutex> lock(g_mutex);
                 title = g_songTitle;
                 artist = g_songArtist;
+                timeStr = g_songTime;
                 cover = g_hCoverImage; // Shallow copy the handle for rendering
                 progress = g_songProgress;
                 isPlaying = g_isPlaying;
@@ -453,6 +505,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             RECT artistRect = { 151, 54, 368, 72 };
             SelectObject(hdc, hFontArtist);
             DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+            
+            if (!timeStr.empty()) {
+                DrawTextW(hdc, timeStr.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_RIGHT);
+            }
 
             SelectObject(hdc, hOldFont);
             DeleteObject(hFontTitle);
@@ -669,7 +725,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int posY = screenHeight - WINDOW_HEIGHT - 50;
 
     HWND hwnd = CreateWindowEx(
-        exStyle, CLASS_NAME, L"Audio Visualizer", style,
+        exStyle, CLASS_NAME, L"Yellow's Playback", style,
         posX, posY, WINDOW_WIDTH, WINDOW_HEIGHT,
         NULL, NULL, hInstance, NULL
     );
