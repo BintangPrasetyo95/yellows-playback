@@ -51,6 +51,7 @@ Gdiplus::Image* g_imgPinOn = nullptr;
 Gdiplus::Image* g_imgPinOff = nullptr;
 Gdiplus::Image* g_imgClose = nullptr;
 Gdiplus::Image* g_imgBorder = nullptr;
+Gdiplus::Image* g_imgTitleBorder = nullptr;
 bool g_isPinned = true;
 bool g_isMuted = false;
 double g_seekRequest = -1.0;
@@ -429,10 +430,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
             RECT titleRect = { 150, 36, 368, 61 };
+            
+            // Independent box rect for the title background/shaping
+            RECT titleBoxRect = { 136, 27, 379, 83 }; // Slightly larger than titleRect, adjust as needed
+            if (g_imgTitleBorder) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgTitleBorder, 
+                                   (INT)titleBoxRect.left, 
+                                   (INT)titleBoxRect.top, 
+                                   (INT)(titleBoxRect.right - titleBoxRect.left), 
+                                   (INT)(titleBoxRect.bottom - titleBoxRect.top));
+            }
+
             HFONT hOldFont = (HFONT)SelectObject(hdc, hFontTitle);
             DrawTextW(hdc, title.c_str(), -1, &titleRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            RECT artistRect = { 150, 57, 368, 100 };
+            RECT artistRect = { 150, 54, 368, 97 };
             SelectObject(hdc, hFontArtist);
             DrawTextW(hdc, artist.c_str(), -1, &artistRect, DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -598,6 +614,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_imgPinOff = new Gdiplus::Image(L"./assets/components/pin_off.png");
     g_imgClose = new Gdiplus::Image(L"./assets/components/close.png");
     g_imgBorder = new Gdiplus::Image(L"./assets/components/border.png");
+    g_imgTitleBorder = new Gdiplus::Image(L"./assets/components/title_border.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -668,6 +685,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_imgPinOff) delete g_imgPinOff;
     if (g_imgClose) delete g_imgClose;
     if (g_imgBorder) delete g_imgBorder;
+    if (g_imgTitleBorder) delete g_imgTitleBorder;
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
