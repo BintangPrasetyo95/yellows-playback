@@ -432,8 +432,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             RECT titleRect = { 151, 38, 368, 60 };
             
-            // Independent box rect for the title background/shaping
-            RECT titleBoxRect = { 136, 27, 379, 83 }; // Slightly larger than titleRect, adjust as needed
+            // Draw Title Background Image
+            RECT titleBoxRect = { 136, 27, 379, 83 };
             if (g_imgTitleBorder) {
                 Gdiplus::Graphics graphics(hdc);
                 graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
@@ -504,7 +504,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 graphics.DrawImage(g_imgClose, 333, 19, 38, 13);
             }
 
-            // Dedicated box rect for progress bar shaping/background
+            // Draw Progress Bar Track/Background (grey track)
+            HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
+            RECT barBgRect = { 147, 93, 368, 104 };
+            FillRect(hdc, &barBgRect, barBg);
+            DeleteObject(barBg);
+
+            // Draw Progress Bar Foreground
+            if (progress > 0.0) {
+                int fillWidth = (int)(221 * progress);
+                if (fillWidth > 221) fillWidth = 221;
+                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
+                RECT barFgRect = { 147, 93, 147 + fillWidth, 104 };
+                FillRect(hdc, &barFgRect, barFg);
+                DeleteObject(barFg);
+            }
+
+            // Draw Progress Bar Border Image (drawn on top)
             RECT progBoxRect = { 136, 88, 379, 109 };
             if (g_imgProgressBorder) {
                 Gdiplus::Graphics graphics(hdc);
@@ -516,22 +532,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                                    (INT)progBoxRect.top, 
                                    (INT)(progBoxRect.right - progBoxRect.left), 
                                    (INT)(progBoxRect.bottom - progBoxRect.top));
-            }
-
-            // Draw Progress Bar Track/Background (grey track)
-            HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
-            RECT barBgRect = { 147, 93, 368, 104 };
-            FillRect(hdc, &barBgRect, barBg);
-            DeleteObject(barBg);
-
-            // Temporarily hidden: Draw Progress Bar Foreground
-            if (progress > 0.0) {
-                int fillWidth = (int)(221 * progress);
-                if (fillWidth > 221) fillWidth = 221;
-                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
-                RECT barFgRect = { 147, 93, 147 + fillWidth, 104 };
-                FillRect(hdc, &barFgRect, barFg);
-                DeleteObject(barFg);
             }
 
             // Draw Media Controls
