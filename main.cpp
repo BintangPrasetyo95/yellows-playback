@@ -52,6 +52,7 @@ Gdiplus::Image* g_imgPinOff = nullptr;
 Gdiplus::Image* g_imgClose = nullptr;
 Gdiplus::Image* g_imgBorder = nullptr;
 Gdiplus::Image* g_imgTitleBorder = nullptr;
+Gdiplus::Image* g_imgProgressBorder = nullptr;
 bool g_isPinned = true;
 bool g_isMuted = false;
 double g_seekRequest = -1.0;
@@ -503,18 +504,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 graphics.DrawImage(g_imgClose, 333, 19, 38, 13);
             }
 
-            // Draw Progress Bar Background
+            // Dedicated box rect for progress bar shaping/background
+            RECT progBoxRect = { 136, 88, 379, 109 };
+            if (g_imgProgressBorder) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgProgressBorder, 
+                                   (INT)progBoxRect.left, 
+                                   (INT)progBoxRect.top, 
+                                   (INT)(progBoxRect.right - progBoxRect.left), 
+                                   (INT)(progBoxRect.bottom - progBoxRect.top));
+            }
+
+            // Draw Progress Bar Track/Background (grey track)
             HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
             RECT barBgRect = { 147, 93, 368, 104 };
             FillRect(hdc, &barBgRect, barBg);
             DeleteObject(barBg);
 
-            // Draw Progress Bar Foreground
+            // Temporarily hidden: Draw Progress Bar Foreground
             if (progress > 0.0) {
-                // The new width of barBgRect is 363 - 141 = 222
                 int fillWidth = (int)(221 * progress);
                 if (fillWidth > 221) fillWidth = 221;
-                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255)); // Now drawn over the new position
+                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
                 RECT barFgRect = { 147, 93, 147 + fillWidth, 104 };
                 FillRect(hdc, &barFgRect, barFg);
                 DeleteObject(barFg);
@@ -615,6 +629,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_imgClose = new Gdiplus::Image(L"./assets/components/close.png");
     g_imgBorder = new Gdiplus::Image(L"./assets/components/border.png");
     g_imgTitleBorder = new Gdiplus::Image(L"./assets/components/title_border.png");
+    g_imgProgressBorder = new Gdiplus::Image(L"./assets/components/progress_border.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -686,6 +701,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_imgClose) delete g_imgClose;
     if (g_imgBorder) delete g_imgBorder;
     if (g_imgTitleBorder) delete g_imgTitleBorder;
+    if (g_imgProgressBorder) delete g_imgProgressBorder;
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
