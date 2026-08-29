@@ -53,6 +53,7 @@ Gdiplus::Image* g_imgClose = nullptr;
 Gdiplus::Image* g_imgBorder = nullptr;
 Gdiplus::Image* g_imgTitleBorder = nullptr;
 Gdiplus::Image* g_imgProgressBorder = nullptr;
+Gdiplus::Image* g_imgButtonsBackground = nullptr;
 bool g_isPinned = true;
 bool g_isMuted = false;
 double g_seekRequest = -1.0;
@@ -505,7 +506,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Draw Progress Bar Track/Background (grey track)
-            HBRUSH barBg = CreateSolidBrush(RGB(50, 50, 50));
+            HBRUSH barBg = CreateSolidBrush(RGB(100, 100, 100));
             RECT barBgRect = { 147, 93, 368, 104 };
             FillRect(hdc, &barBgRect, barBg);
             DeleteObject(barBg);
@@ -532,6 +533,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                                    (INT)progBoxRect.top, 
                                    (INT)(progBoxRect.right - progBoxRect.left), 
                                    (INT)(progBoxRect.bottom - progBoxRect.top));
+            }
+
+            // Draw Media Controls Background Image
+            RECT mediaBoxRect = { 136, 117, 379, 144 };
+            if (g_imgButtonsBackground) {
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+                graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+                graphics.DrawImage(g_imgButtonsBackground, 
+                                   (INT)mediaBoxRect.left, 
+                                   (INT)mediaBoxRect.top, 
+                                   (INT)(mediaBoxRect.right - mediaBoxRect.left), 
+                                   (INT)(mediaBoxRect.bottom - mediaBoxRect.top));
             }
 
             // Draw Media Controls
@@ -630,6 +645,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_imgBorder = new Gdiplus::Image(L"./assets/components/border.png");
     g_imgTitleBorder = new Gdiplus::Image(L"./assets/components/title_border.png");
     g_imgProgressBorder = new Gdiplus::Image(L"./assets/components/progress_border.png");
+    g_imgButtonsBackground = new Gdiplus::Image(L"./assets/components/buttons_background.png");
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
@@ -702,6 +718,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_imgBorder) delete g_imgBorder;
     if (g_imgTitleBorder) delete g_imgTitleBorder;
     if (g_imgProgressBorder) delete g_imgProgressBorder;
+    if (g_imgButtonsBackground) delete g_imgButtonsBackground;
 
     RemoveFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);
 
