@@ -24,6 +24,7 @@
 #include <mutex>
 #include <thread>
 #include <iostream>
+#include <map>
 
 using namespace winrt;
 using namespace Windows::Foundation;
@@ -32,6 +33,20 @@ using namespace Windows::Storage::Streams;
 
 const int WINDOW_WIDTH = 400;
 const int WINDOW_HEIGHT = 176;
+
+std::wstring g_currentTheme = L"wood";
+struct ThemeColors {
+    COLORREF progressFg;
+    COLORREF progressBg;
+    COLORREF text;
+};
+
+std::map<std::wstring, ThemeColors> g_themeColors = {
+    { L"default", { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) } },
+    { L"wood", { RGB(255, 211, 181), RGB(46, 15, 10), RGB(255, 211, 181) } }
+};
+
+ThemeColors g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) };
 
 std::mutex g_mutex;
 std::wstring g_songTitle = L"Waiting for media...";
@@ -211,7 +226,7 @@ void FetchMediaLoop(HWND hwnd) {
                 bool needsCoverRetry = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
-                    if (g_hCoverImage == NULL && thumbnailRetryCount < 10 && currentTitle != L"") {
+                    if (g_hCoverImage == NULL && thumbnailRetryCount < 40 && currentTitle != L"") {
                         needsCoverRetry = true;
                     }
                 }
@@ -246,12 +261,14 @@ void FetchMediaLoop(HWND hwnd) {
                             if (pStream) {
                                 Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
                                 if (pBitmap) {
-                                    // Scale bitmap smoothly to 75x75
-                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(90, 90, pBitmap->GetPixelFormat());
+                                    // Scale bitmap smoothly to 90x90
+                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(90, 90, PixelFormat32bppARGB);
                                     Gdiplus::Graphics* graphics = Gdiplus::Graphics::FromImage(resized);
                                     graphics->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+                                    // Fill with black to prevent transparent edge bleed
+                                    graphics->Clear(Gdiplus::Color(255, 0, 0, 0));
                                     graphics->DrawImage(pBitmap, 0, 0, 90, 90);
-                                    resized->GetHBITMAP(Gdiplus::Color(255, 0, 255), &newCover); // Background color key (magenta)
+                                    resized->GetHBITMAP(Gdiplus::Color(0, 0, 0), &newCover); // Background color key (black)
                                     delete graphics;
                                     delete resized;
                                     delete pBitmap;
@@ -487,7 +504,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Draw Text
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(0, 0, 0)); // Black text
+            SetTextColor(hdc, g_currentThemeColors.text);
             
             int titleSize = HasJapaneseCharacters(title) ? 20 : 22;
             int artistSize = HasJapaneseCharacters(artist) ? 14 : 16;
@@ -499,7 +516,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HFONT hFontTime = CreateFontW(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Determination");
 
-            RECT titleRect = { 151, 38, 368, 60 };
+            RECT titleRect = { 151, 38, 365, 60 };
             
             // Draw Title Background Image
             RECT titleBoxRect = { 136, 27, 379, 83 };
@@ -597,8 +614,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 graphics.DrawImage(g_imgClose, 333, 19, 38, 13);
             }
 
-            // Draw Progress Bar Track/Background (grey track)
-            HBRUSH barBg = CreateSolidBrush(RGB(100, 100, 100));
+            // Draw Progress Bar Track/Background (theme colored track)
+            HBRUSH barBg = CreateSolidBrush(g_currentThemeColors.progressBg);
             RECT barBgRect = { 147, 93, 368, 104 };
             FillRect(hdc, &barBgRect, barBg);
             DeleteObject(barBg);
@@ -607,7 +624,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (progress > 0.0) {
                 int fillWidth = (int)(221 * progress);
                 if (fillWidth > 221) fillWidth = 221;
-                HBRUSH barFg = CreateSolidBrush(RGB(255, 255, 255));
+                HBRUSH barFg = CreateSolidBrush(g_currentThemeColors.progressFg);
                 RECT barFgRect = { 147, 93, 147 + fillWidth, 104 };
                 FillRect(hdc, &barFgRect, barFg);
                 DeleteObject(barFg);
@@ -723,21 +740,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ULONG_PTR gdiplusToken;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
     
+    // Initialize theme color
+    if (g_themeColors.count(g_currentTheme)) {
+        g_currentThemeColors = g_themeColors[g_currentTheme];
+    } else {
+        g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) }; // Fallback color
+    }
+
     // Load images
-    g_imgBackground = new Gdiplus::Image(L"./assets/components/background.png");
-    g_imgPrev = new Gdiplus::Image(L"./assets/components/prev.png");
-    g_imgPlay = new Gdiplus::Image(L"./assets/components/play.png");
-    g_imgPause = new Gdiplus::Image(L"./assets/components/pause.png");
-    g_imgNext = new Gdiplus::Image(L"./assets/components/next.png");
-    g_imgSoundOn = new Gdiplus::Image(L"./assets/components/sound_on.png");
-    g_imgSoundOff = new Gdiplus::Image(L"./assets/components/sound_off.png");
-    g_imgPinOn = new Gdiplus::Image(L"./assets/components/pin_on.png");
-    g_imgPinOff = new Gdiplus::Image(L"./assets/components/pin_off.png");
-    g_imgClose = new Gdiplus::Image(L"./assets/components/close.png");
-    g_imgBorder = new Gdiplus::Image(L"./assets/components/border.png");
-    g_imgTitleBorder = new Gdiplus::Image(L"./assets/components/title_border.png");
-    g_imgProgressBorder = new Gdiplus::Image(L"./assets/components/progress_border.png");
-    g_imgButtonsBackground = new Gdiplus::Image(L"./assets/components/buttons_background.png");
+    std::wstring basePath = L"./assets/components/" + g_currentTheme + L"/";
+    g_imgBackground = new Gdiplus::Image((basePath + L"background.png").c_str());
+    g_imgPrev = new Gdiplus::Image((basePath + L"prev.png").c_str());
+    g_imgPlay = new Gdiplus::Image((basePath + L"play.png").c_str());
+    g_imgPause = new Gdiplus::Image((basePath + L"pause.png").c_str());
+    g_imgNext = new Gdiplus::Image((basePath + L"next.png").c_str());
+    g_imgSoundOn = new Gdiplus::Image((basePath + L"sound_on.png").c_str());
+    g_imgSoundOff = new Gdiplus::Image((basePath + L"sound_off.png").c_str());
+    g_imgPinOn = new Gdiplus::Image((basePath + L"pin_on.png").c_str());
+    g_imgPinOff = new Gdiplus::Image((basePath + L"pin_off.png").c_str());
+    g_imgClose = new Gdiplus::Image((basePath + L"close.png").c_str());
+    g_imgBorder = new Gdiplus::Image((basePath + L"border.png").c_str());
+    g_imgTitleBorder = new Gdiplus::Image((basePath + L"title_border.png").c_str());
+    g_imgProgressBorder = new Gdiplus::Image((basePath + L"progress_border.png").c_str());
+    g_imgButtonsBackground = new Gdiplus::Image((basePath + L"buttons_background.png").c_str());
 
     // Load custom font
     AddFontResourceExW(L"./assets/fonts/determination/determination.ttf", FR_PRIVATE, 0);

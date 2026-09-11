@@ -2,6 +2,13 @@
 
 A lightweight, transparent desktop overlay for displaying current media playback information (Song Title, Artist, Album Art, and a Progress Bar).
 
+## (Personal Development)
+
+```cmd
+D:
+cd D:\Work\Projects\yellows-playback
+```
+
 ## Building
 
 This project requires the Microsoft Visual C++ (MSVC) compiler and the Windows SDK. To compile the project, open the **x64 Native Tools Command Prompt for VS** (or an equivalent developer prompt where `cl.exe` is available) and run:
