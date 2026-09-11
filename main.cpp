@@ -42,17 +42,17 @@ struct ThemeColors {
 };
 
 std::map<std::wstring, ThemeColors> g_themeColors = {
-    { L"default", { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) } },
+    { L"default", { RGB(255, 255, 255), RGB(100, 100, 100), RGB(1, 1, 1) } },
     { L"wood", { RGB(255, 211, 181), RGB(46, 15, 10), RGB(255, 211, 181) } }
 };
 
-ThemeColors g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) };
+ThemeColors g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(1, 1, 1) };
 
 std::mutex g_mutex;
 std::wstring g_songTitle = L"Waiting for media...";
 std::wstring g_songArtist = L"";
 std::wstring g_songTime = L"";
-HBITMAP g_hCoverImage = NULL;
+Gdiplus::Bitmap* g_imgCover = nullptr;
 bool g_running = true;
 double g_songProgress = 0.0;
 ULONGLONG g_lastSyncTick = 0;
@@ -226,7 +226,7 @@ void FetchMediaLoop(HWND hwnd) {
                 bool needsCoverRetry = false;
                 {
                     std::lock_guard<std::mutex> lock(g_mutex);
-                    if (g_hCoverImage == NULL && thumbnailRetryCount < 40 && currentTitle != L"") {
+                    if (g_imgCover == NULL && thumbnailRetryCount < 40 && currentTitle != L"") {
                         needsCoverRetry = true;
                     }
                 }
@@ -245,7 +245,7 @@ void FetchMediaLoop(HWND hwnd) {
                     std::wstring title(info.Title());
                     std::wstring artist(info.Artist());
                     
-                    HBITMAP newCover = NULL;
+                    Gdiplus::Bitmap* newCover = nullptr;
                     auto thumbRef = info.Thumbnail();
                     if (thumbRef) {
                         try {
@@ -262,15 +262,12 @@ void FetchMediaLoop(HWND hwnd) {
                                 Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream);
                                 if (pBitmap) {
                                     // Scale bitmap smoothly to 90x90
-                                    Gdiplus::Bitmap* resized = new Gdiplus::Bitmap(90, 90, PixelFormat32bppARGB);
-                                    Gdiplus::Graphics* graphics = Gdiplus::Graphics::FromImage(resized);
+                                    newCover = new Gdiplus::Bitmap(90, 90, PixelFormat32bppARGB);
+                                    Gdiplus::Graphics* graphics = Gdiplus::Graphics::FromImage(newCover);
                                     graphics->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-                                    // Fill with black to prevent transparent edge bleed
-                                    graphics->Clear(Gdiplus::Color(255, 0, 0, 0));
+                                    graphics->Clear(Gdiplus::Color(0, 0, 0, 0));
                                     graphics->DrawImage(pBitmap, 0, 0, 90, 90);
-                                    resized->GetHBITMAP(Gdiplus::Color(0, 0, 0), &newCover); // Background color key (black)
                                     delete graphics;
-                                    delete resized;
                                     delete pBitmap;
                                 }
                                 pStream->Release();
@@ -285,10 +282,10 @@ void FetchMediaLoop(HWND hwnd) {
                         std::lock_guard<std::mutex> lock(g_mutex);
                         g_songTitle = title;
                         g_songArtist = artist;
-                        if (g_hCoverImage) {
-                            DeleteObject(g_hCoverImage);
+                        if (g_imgCover) {
+                            delete g_imgCover;
                         }
-                        g_hCoverImage = newCover;
+                        g_imgCover = newCover;
                     }
                     
                     // Tell the window to repaint itself immediately
@@ -306,9 +303,9 @@ void FetchMediaLoop(HWND hwnd) {
                 g_syncProgress = 0.0;
                 g_songDuration = 0;
                 g_isPlaying = false;
-                if (g_hCoverImage) {
-                    DeleteObject(g_hCoverImage);
-                    g_hCoverImage = NULL;
+                if (g_imgCover) {
+                    delete g_imgCover;
+                    g_imgCover = nullptr;
                 }
                 InvalidateRect(hwnd, NULL, FALSE);
             }
@@ -447,13 +444,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HDC hdcWindow = BeginPaint(hwnd, &ps);
 
             HDC hdc = CreateCompatibleDC(hdcWindow);
-            HBITMAP hMemBmp = CreateCompatibleBitmap(hdcWindow, WINDOW_WIDTH, WINDOW_HEIGHT);
+            
+            // Create a 32-bit DIB section for UpdateLayeredWindow
+            BITMAPINFO bmi = {0};
+            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = WINDOW_WIDTH;
+            bmi.bmiHeader.biHeight = -WINDOW_HEIGHT; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            
+            void* pBits = nullptr;
+            HBITMAP hMemBmp = CreateDIBSection(hdcWindow, &bmi, DIB_RGB_COLORS, &pBits, NULL, 0);
             HBITMAP hOldBmp = (HBITMAP)SelectObject(hdc, hMemBmp);
+            
+            // Clear the background to transparent (0,0,0,0) instead of a solid color
+            // Memory from CreateDIBSection is initially zeroed out, so no need to clear.
 
-            HBRUSH bgBrush = CreateSolidBrush(RGB(255, 0, 255));
-            RECT clientRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
-            FillRect(hdc, &clientRect, bgBrush);
-            DeleteObject(bgBrush);
 
             // Draw custom background image
             if (g_imgBackground) {
@@ -467,7 +474,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             std::wstring title, artist, timeStr;
-            HBITMAP cover;
+            Gdiplus::Bitmap* cover;
             double progress;
             bool isPlaying;
             {
@@ -475,21 +482,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 title = g_songTitle;
                 artist = g_songArtist;
                 timeStr = g_songTime;
-                cover = g_hCoverImage; // Shallow copy the handle for rendering
+                cover = g_imgCover; // Shallow copy the handle for rendering
                 progress = g_songProgress;
                 isPlaying = g_isPlaying;
             }
 
             // Draw Cover
             if (cover) {
-                HDC hMemDC = CreateCompatibleDC(hdc);
-                HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, cover);
-                BitBlt(hdc, 30, 43, 90, 90, hMemDC, 0, 0, SRCCOPY);
-                SelectObject(hMemDC, hOldBitmap);
-                DeleteDC(hMemDC);
+                Gdiplus::Graphics graphics(hdc);
+                graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+                graphics.DrawImage(cover, 30, 43, 90, 90);
             } else {
                 HBRUSH placeholder = CreateSolidBrush(RGB(50, 50, 50));
-                RECT coverRect = { 30, 43, 120, 133 }; // size+original-size, size+original-size
+                RECT coverRect = { 30, 43, 120, 133 };
                 FillRect(hdc, &coverRect, placeholder);
                 DeleteObject(placeholder);
             }
@@ -710,7 +715,36 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             DeleteObject(ctrlFgBrush);
             DeleteObject(nullPen);
 
-            BitBlt(hdcWindow, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hdc, 0, 0, SRCCOPY);
+            // Since we used GDI mixed with GDI+, we need to fix the alpha channel
+            // Any pixel that is completely black (0,0,0,0) remains transparent.
+            // All other pixels will have their alpha set to 255.
+            // Fix alpha channel for GDI text. 
+            // GDI clears the alpha channel to 0, which makes text invisible in UpdateLayeredWindow.
+            // Since text is drawn over an opaque background, we just set alpha to 255 for the text areas.
+            if (pBits) {
+                BYTE* pPixels = (BYTE*)pBits;
+                RECT fixRects[] = {
+                    { 151, 38, 368, 71 }, // title and artist area
+                    { 151, 55, 368, 71 },  // artist/time area
+                    { 147, 93, 368, 104 } // progress bar area
+                };
+                for (const auto& r : fixRects) {
+                    for (int y = r.top; y < r.bottom; ++y) {
+                        for (int x = r.left; x < r.right; ++x) {
+                            if (x >= 0 && x < WINDOW_WIDTH && y >= 0 && y < WINDOW_HEIGHT) {
+                                pPixels[(y * WINDOW_WIDTH + x) * 4 + 3] = 255;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Perform the Layered Window Update
+            POINT ptSrc = {0, 0};
+            SIZE size = {WINDOW_WIDTH, WINDOW_HEIGHT};
+            BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+            UpdateLayeredWindow(hwnd, hdcWindow, NULL, &size, hdc, &ptSrc, 0, &blend, ULW_ALPHA);
+
             SelectObject(hdc, hOldBmp);
             DeleteObject(hMemBmp);
             DeleteDC(hdc);
@@ -744,7 +778,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_themeColors.count(g_currentTheme)) {
         g_currentThemeColors = g_themeColors[g_currentTheme];
     } else {
-        g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(0, 0, 0) }; // Fallback color
+        g_currentThemeColors = { RGB(255, 255, 255), RGB(100, 100, 100), RGB(1, 1, 1) }; // Fallback color
     }
 
     // Load images
@@ -793,7 +827,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     if (hwnd == NULL) return 0;
 
-    SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
+    // SetLayeredWindowAttributes removed; using UpdateLayeredWindow in WM_PAINT
     ShowWindow(hwnd, nCmdShow);
 
     // Start background thread for media updates
@@ -808,8 +842,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_running = false;
     mediaThread.join();
 
-    if (g_hCoverImage) {
-        DeleteObject(g_hCoverImage);
+    if (g_imgCover) {
+        delete g_imgCover;
     }
 
     if (g_imgBackground) {
